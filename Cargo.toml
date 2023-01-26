@@ -2,6 +2,12 @@
 name = "tehda"
 version = "0.1.0"
 edition = "2021"
+authors = ["Nadia (https://mikufan.page)", "Autumn <auctumnus@pm.me> (https://autumns.page)"]
+description = "Wayland launcher/menu program"
+license-file = "LICENSE"
+keywords=["wayland","launcher","menu"]
+categories = ["gui"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

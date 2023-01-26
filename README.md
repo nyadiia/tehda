@@ -1,6 +1,6 @@
 # tehda
 
-tehda ([/ˈteɪ̯.dæ/ or /teh.da/; Finnish for "to do, perform, execute"][tehda-wikt])
+tehda ([ᴛᴀʏ-dah /ˈteɪ̯.dæ/ or /teh.da/; Finnish for "to do, perform, execute"][tehda-wikt])
 is a launcher/menu program, like [`dmenu`][dmenu], [`rofi`][rofi], or
 [`wofi`][wofi], written in Rust. It runs on [wlroots][wlroots]-based
 [Wayland][wayland] compositors.
