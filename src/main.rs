@@ -26,11 +26,12 @@ fn update_entries(query: GString) {
     println!("{}", query);
 }
 
-/// Handler for global key-presses.
-/// Not meant to handle the actual input.
 fn keypress_handler_with_config(
-    config: Config,
-) -> impl Fn(&ApplicationWindow, &EventKey) -> Inhibit {
+    // <autumn>: if i change [this type] to a ref it gets mad about me moving the value
+    //           in there and then has a whole bunch of lifetime bullshit going on
+    // <ash>: THIS is the point of leaking! autumn im gonna leak just for you
+    config: &Config,
+) -> impl Fn(&ApplicationWindow, &EventKey) -> Inhibit + '_ {
     move |_window: &ApplicationWindow, keypress: &EventKey| -> Inhibit {
         if let Some(key_name) = keypress.keyval().name().map(|s| s) {
             match key_name {
@@ -46,11 +47,11 @@ fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
     let args: Args = argh::from_env();
-    let config = config::load_config(args.config);
+    let config = Box::leak(Box::new(config::load_config(args.config)));
 
     if args.dump_config {
         trace!("dumping config and exiting");
-        println!("{}", serde_yaml::to_string(&config).unwrap());
+        println!("{}", serde_yaml::to_string(config).unwrap());
         exit(0);
     }
 
@@ -58,7 +59,7 @@ fn main() {
         .application_id("page.mikufan.tehda")
         .build();
 
-    app.connect_activate(move |app| {
+    app.connect_activate(|app| {
         trace!("building window");
         // TODO: this works, but gtk starts spewing `CRITICAL`s into stdout
         let win = ApplicationWindow::builder()
@@ -76,8 +77,7 @@ fn main() {
             .build();
         // <autumn>: i just fixed it by cloning it
         //         : config won't change during runtime so it's fine
-        // <ash>: a blade stabs into my heart
-        win.connect_key_press_event(keypress_handler_with_config(config.clone()));
+        win.connect_key_press_event(keypress_handler_with_config(config));
 
         gtk_layer_shell::init_for_window(&win);
 
