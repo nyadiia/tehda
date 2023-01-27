@@ -4,6 +4,13 @@ use log::{info, trace, warn};
 use std::env;
 use serde::{Serialize, Deserialize};
 
+fn make_serde_default<'a, T: Deserialize<'a>>() -> T {
+    // <autumn>: i'm just gonna .unwrap() this 'cause i don't think it'll 
+    //           ever fail
+    // <ash>: famous last words
+    serde_yaml::from_str("{}").unwrap()
+}
+
 fn default_modes() -> Vec<String> {
     vec!("drun".to_string())
 }
@@ -21,7 +28,7 @@ pub struct Keybinds {
 
 impl Default for Keybinds {
     fn default() -> Self {
-        serde_yaml::from_str("{}").unwrap()
+        make_serde_default()
     }
 }
 
@@ -83,11 +90,7 @@ pub fn load_config(cfg_path: Option<OsString>) -> Config {
         .into_iter()
         .map(OsString::from)
         .find_map(try_load_config)
-        // <autumn>: i'm just gonna .unwrap() this 'cause i don't think it'll 
-        //           ever fail
-        // <ash>: famous last words
-        //
         // if we can't find any configs that we can read and parse,
         // just load the default config
-        .unwrap_or_else(|| serde_yaml::from_str("{}").unwrap())
+        .unwrap_or_else(|| make_serde_default())
 }
