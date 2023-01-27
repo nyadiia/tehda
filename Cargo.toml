@@ -3,7 +3,7 @@ name = "tehda"
 version = "0.1.0"
 edition = "2021"
 authors = [
-    "Nadia (https://mikufan.page)",
+    "Nadia <nyadiia@pm.me> (https://mikufan.page)",
     "Autumn <auctumnus@pm.me> (https://autumns.page)",
     "Ash <ash.zsh@proton.me>",
 ]
