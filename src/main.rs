@@ -1,5 +1,6 @@
 use argh::FromArgs;
 use config::Config;
+use gdk::glib::GString;
 use gdk::EventKey;
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
@@ -21,6 +22,12 @@ struct Args {
     dump_config: bool,
 }
 
+fn update_entries(query: GString) {
+    println!("{}", query);
+}
+
+/// Handler for global key-presses.
+/// Not meant to handle the actual input.
 fn keypress_handler_with_config(
     config: Config,
 ) -> impl Fn(&ApplicationWindow, &EventKey) -> Inhibit {
@@ -76,11 +83,24 @@ fn main() {
 
         gtk_layer_shell::set_layer(&win, gtk_layer_shell::Layer::Overlay);
 
+        let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+
+        //let scrolled_window = gtk::ScrolledWindow::new(None, None);
+
         let label = gtk::Label::new(Some(""));
 
         label.set_markup("<span font_desc=\"20.0\">haii</span>");
-        win.add(&label);
+        container.add(&label);
         win.set_border_width(12);
+
+        let input = gtk::Entry::new();
+        container.add(&input);
+
+        input.connect_changed(|i| update_entries(i.text()));
+
+        input.set_icon_from_icon_name(gtk::EntryIconPosition::Primary, Some("search"));
+
+        win.add(&container);
 
         trace!("showing window");
         win.show_all();
