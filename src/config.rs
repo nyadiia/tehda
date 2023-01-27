@@ -1,8 +1,8 @@
 use log::{trace, warn};
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::ffi::OsString;
-use std::path::Path;
+use std::fmt::Debug;
+use std::path::{Path, PathBuf};
 
 /// Returns the default object as parsed by Serde.
 /// Requires all fields on the object to either 1. have a #[serde(default)] or
@@ -57,28 +57,46 @@ pub struct Config {
 }
 
 /// Try to load the config from a file.
-fn try_load_config(path: OsString) -> Option<Config> {
-    trace!("trying to load config from `{:?}`", &path);
+fn try_load_config<P: AsRef<Path>>(path: P) -> Option<Config> {
+    trace!("trying to load config from `{:?}`", path.as_ref());
+
     match std::fs::read_to_string(&path) {
         Ok(cfg_file) => match serde_yaml::from_str(&cfg_file) {
             Ok(config) => {
-                trace!("loaded config from `{:?}`", path);
+                trace!("loaded config from `{:?}`", path.as_ref());
                 Some(config)
             }
             Err(e) => {
-                warn!("couldn't parse `{:?}`: {}", path, e);
+                warn!("couldn't parse `{:?}`: {}", path.as_ref(), e);
                 None
             }
         },
         Err(e) => {
-            warn!("couldn't read `{:?}`: {}", path, e);
+            warn!("couldn't read `{:?}`: {}", path.as_ref(), e);
             None
         }
     }
 }
 
+/// Returns the path to attempt to load the config from
+fn config_path() -> Option<PathBuf> {
+    env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            env::var_os("HOME").map(|v| {
+                let mut buf = PathBuf::from(v);
+                buf.push(".config");
+                buf
+            })
+        })
+        .map(|mut v| {
+            v.push("tehda/tehda.yaml");
+            v
+        })
+}
+
 /// Load the Tehda config.
-pub fn load_config(cfg_path: Option<OsString>) -> Config {
+pub fn load_config<P: AsRef<Path>>(cfg_path: Option<P>) -> Config {
     trace!("trying to load config");
     if let Some(p) = cfg_path {
         trace!("user provided config");
@@ -86,19 +104,10 @@ pub fn load_config(cfg_path: Option<OsString>) -> Config {
             return config;
         }
     }
-    let default_paths = vec![
-        // $XDG_CONFIG_HOME/tehda/tehda.yaml
-        env::var_os("XDG_CONFIG_HOME").map(|v| Path::new(&v).join("/tehda/tehda.yaml")),
-        // $HOME/.config/tehda/tehda.yaml
-        env::var_os("HOME").map(|v| Path::new(&v).join("/.config/tehda/tehda.yaml")),
-        Some(Path::new("~/.config/tehda/tehda.yaml").to_path_buf()),
-    ];
-    default_paths
-        .into_iter()
-        .filter_map(|p| p)
-        .map(OsString::from)
-        .find_map(try_load_config)
+
+    config_path()
+        .and_then(try_load_config)
         // if we can't find any configs that we can read and parse,
         // just load the default config
-        .unwrap_or_else(|| make_serde_default())
+        .unwrap_or_else(make_serde_default)
 }
