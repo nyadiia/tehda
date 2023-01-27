@@ -1,13 +1,11 @@
-use std::ffi::OsString;
-use std::process::exit;
+use argh::FromArgs;
 use config::Config;
 use gdk::EventKey;
-use gdk::glib::GString;
-use gdk::keys::constants::Escape;
-use log::{info, trace, warn};
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
-use argh::FromArgs;
+use log::trace;
+use std::ffi::OsString;
+use std::process::exit;
 
 mod config;
 
@@ -20,23 +18,22 @@ struct Args {
 
     /// print the config (usually the default one) and exit
     #[argh(switch)]
-    dump_config: bool
+    dump_config: bool,
 }
 
-fn keypress_handler_with_config(config: Config) -> impl Fn(&ApplicationWindow, &EventKey) -> Inhibit {
+fn keypress_handler_with_config(
+    config: Config,
+) -> impl Fn(&ApplicationWindow, &EventKey) -> Inhibit {
     move |_window: &ApplicationWindow, keypress: &EventKey| -> Inhibit {
         if let Some(key_name) = keypress.keyval().name().map(|s| s) {
             match key_name {
-                s if &s == &config.keybinds.quit => {
-                    exit(0)
-                },
+                s if &s == &config.keybinds.quit => exit(0),
                 _ => {}
             }
         }
         gtk::Inhibit(false)
     }
 }
-
 
 fn main() {
     pretty_env_logger::init();
@@ -46,7 +43,7 @@ fn main() {
 
     if args.dump_config {
         trace!("dumping config and exiting");
-        println!("{}", serde_yaml::to_string(&config).unwrap()); 
+        println!("{}", serde_yaml::to_string(&config).unwrap());
         exit(0);
     }
 
@@ -72,14 +69,15 @@ fn main() {
             .build();
         // <autumn>: i just fixed it by cloning it
         //         : config won't change during runtime so it's fine
+        // <ash>: a blade stabs into my heart
         win.connect_key_press_event(keypress_handler_with_config(config.clone()));
-        
+
         gtk_layer_shell::init_for_window(&win);
 
         gtk_layer_shell::set_layer(&win, gtk_layer_shell::Layer::Overlay);
 
         let label = gtk::Label::new(Some(""));
-        
+
         label.set_markup("<span font_desc=\"20.0\">haii</span>");
         win.add(&label);
         win.set_border_width(12);

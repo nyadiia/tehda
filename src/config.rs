@@ -1,29 +1,38 @@
-use std::path::Path;
-use std::ffi::OsString;
-use log::{info, trace, warn};
+use log::{trace, warn};
+use serde::{Deserialize, Serialize};
 use std::env;
-use serde::{Serialize, Deserialize};
+use std::ffi::OsString;
+use std::path::Path;
 
+/// Returns the default object as parsed by Serde.
+/// Requires all fields on the object to either 1. have a #[serde(default)] or
+/// 2. be `Optional<T>`.
 fn make_serde_default<'a, T: Deserialize<'a>>() -> T {
-    // <autumn>: i'm just gonna .unwrap() this 'cause i don't think it'll 
+    // <autumn>: i'm just gonna .unwrap() this 'cause i don't think it'll
     //           ever fail
     // <ash>: famous last words
     serde_yaml::from_str("{}").unwrap()
 }
 
 fn default_modes() -> Vec<String> {
-    vec!("drun".to_string())
+    vec!["drun".to_string()]
 }
 
-fn default_width() -> i32 { 320 }
-fn default_height() -> i32 { 200 }
+fn default_width() -> i32 {
+    320
+}
+fn default_height() -> i32 {
+    200
+}
 
-fn default_keybind_quit() -> String { "Escape".to_string() }
+fn default_keybind_quit() -> String {
+    "Escape".to_string()
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Keybinds {
     #[serde(default = "default_keybind_quit")]
-    pub quit: String
+    pub quit: String,
 }
 
 impl Default for Keybinds {
@@ -44,7 +53,7 @@ pub struct Config {
     pub height: i32,
 
     #[serde(default)]
-    pub keybinds: Keybinds
+    pub keybinds: Keybinds,
 }
 
 /// Try to load the config from a file.
@@ -77,17 +86,16 @@ pub fn load_config(cfg_path: Option<OsString>) -> Config {
             return config;
         }
     }
-    // try the other default ones
-    // (i wish i could put these in a separate function but rust doesn't like that)
-    // also maybe TODO: gross
-    vec!(
+    let default_paths = vec![
         // $XDG_CONFIG_HOME/tehda/tehda.yaml
         env::var_os("XDG_CONFIG_HOME").map(|v| Path::new(&v).join("/tehda/tehda.yaml")),
         // $HOME/.config/tehda/tehda.yaml
         env::var_os("HOME").map(|v| Path::new(&v).join("/.config/tehda/tehda.yaml")),
         Some(Path::new("~/.config/tehda/tehda.yaml").to_path_buf()),
-    ).into_iter().filter_map(|p| p)
+    ];
+    default_paths
         .into_iter()
+        .filter_map(|p| p)
         .map(OsString::from)
         .find_map(try_load_config)
         // if we can't find any configs that we can read and parse,
