@@ -47,6 +47,7 @@ fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
     let args: Args = argh::from_env();
+    // safety: i dont care about the leaking here
     let config = Box::leak(Box::new(config::load_config(args.config)));
 
     if args.dump_config {
@@ -75,8 +76,6 @@ fn main() {
             // TODO: we probably don't actually need all events
             .events(gdk::EventMask::ALL_EVENTS_MASK)
             .build();
-        // <autumn>: i just fixed it by cloning it
-        //         : config won't change during runtime so it's fine
         win.connect_key_press_event(keypress_handler_with_config(config));
 
         gtk_layer_shell::init_for_window(&win);
