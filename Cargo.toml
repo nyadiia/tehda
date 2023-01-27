@@ -14,7 +14,10 @@ categories = ["gui"]
 [dependencies]
 argh = "0.1.10"
 gtk = "0.16.2"
+gdk = "0.16.2"
+gtk-layer-shell = "0.5.1"
 confy = { version = "0.5.1", features=["yaml_conf"], default-features=false }
 log = "0.4.17"
+pretty_env_logger = "0.4"
 serde = { version = "1.0.152", features = ["derive"] }
 serde_yaml = "0.9.17"
