@@ -13,7 +13,16 @@ cargo build
 
 ## Config
 
-todo
+Config is contained within a `tehda.yaml` file within one of these locations:
+ - `$XDG_CONFIG_HOME/tehda/tehda.yaml`
+ - `$HOME/.config/tehda/tehda.yaml`
+ - `~/.config/tehda/tehda.yaml`
+(which should all refer to the same file in most cases).
+
+If you would like to create a config from the defaults, run `tehda --dump-config`,
+which will print the config to standard output.
+
+Documentation on these config variables is TODO.
 
 ## License
 
