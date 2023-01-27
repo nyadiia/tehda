@@ -8,19 +8,36 @@ fn default_modes() -> Vec<String> {
     vec!("drun".to_string())
 }
 
-fn default_width() -> usize { 320 }
-fn default_height() -> usize { 200 }
+fn default_width() -> i32 { 320 }
+fn default_height() -> i32 { 200 }
 
-#[derive(Debug, Serialize, Deserialize)]
+fn default_keybind_quit() -> String { "Escape".to_string() }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Keybinds {
+    #[serde(default = "default_keybind_quit")]
+    pub quit: String
+}
+
+impl Default for Keybinds {
+    fn default() -> Self {
+        serde_yaml::from_str("{}").unwrap()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     #[serde(default = "default_modes")]
-    modes: Vec<String>,
+    pub modes: Vec<String>,
 
     #[serde(default = "default_width")]
-    width: usize,
+    pub width: i32,
 
     #[serde(default = "default_height")]
-    height: usize
+    pub height: i32,
+
+    #[serde(default)]
+    pub keybinds: Keybinds
 }
 
 /// Try to load the config from a file.

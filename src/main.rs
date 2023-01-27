@@ -1,5 +1,9 @@
 use std::ffi::OsString;
 use std::process::exit;
+use config::Config;
+use gdk::EventKey;
+use gdk::glib::GString;
+use gdk::keys::constants::Escape;
 use log::{info, trace, warn};
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
@@ -19,6 +23,21 @@ struct Args {
     dump_config: bool
 }
 
+fn keypress_handler_with_config(config: Config) -> impl Fn(&ApplicationWindow, &EventKey) -> Inhibit {
+    move |_window: &ApplicationWindow, keypress: &EventKey| -> Inhibit {
+        if let Some(key_name) = keypress.keyval().name().map(|s| s) {
+            match key_name {
+                s if &s == &config.keybinds.quit => {
+                    exit(0)
+                },
+                _ => {}
+            }
+        }
+        gtk::Inhibit(false)
+    }
+}
+
+
 fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
@@ -35,21 +54,25 @@ fn main() {
         .application_id("page.mikufan.tehda")
         .build();
 
-    app.connect_activate(|app| {
+    app.connect_activate(move |app| {
         trace!("building window");
         // TODO: this works, but gtk starts spewing `CRITICAL`s into stdout
         let win = ApplicationWindow::builder()
             .application(app)
-            .default_width(320)
-            .default_height(200)
+            .default_width(config.width)
+            .default_height(config.height)
             .title("tehda")
             .window_position(gtk::WindowPosition::None)
             .gravity(gdk::Gravity::Center)
             .decorated(false)
             .resizable(false)
-            .has_focus(true)
-
+            .focus_on_map(true)
+            // TODO: we probably don't actually need all events
+            .events(gdk::EventMask::ALL_EVENTS_MASK)
             .build();
+        // <autumn>: i just fixed it by cloning it
+        //         : config won't change during runtime so it's fine
+        win.connect_key_press_event(keypress_handler_with_config(config.clone()));
         
         gtk_layer_shell::init_for_window(&win);
 
