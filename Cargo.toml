@@ -2,10 +2,14 @@
 name = "tehda"
 version = "0.1.0"
 edition = "2021"
-authors = ["Nadia (https://mikufan.page)", "Autumn <auctumnus@pm.me> (https://autumns.page)"]
+authors = [
+    "Nadia (https://mikufan.page)",
+    "Autumn <auctumnus@pm.me> (https://autumns.page)",
+    "Ash <ash.zsh@proton.me>",
+]
 description = "Wayland launcher/menu program"
 license-file = "LICENSE"
-keywords=["wayland","launcher","menu"]
+keywords = ["wayland", "launcher", "menu"]
 categories = ["gui"]
 
 
@@ -16,7 +20,10 @@ argh = "0.1.10"
 gtk = "0.16.2"
 gdk = "0.16.2"
 gtk-layer-shell = "0.5.1"
-confy = { version = "0.5.1", features=["yaml_conf"], default-features=false }
+gio = "0.16.7"
+confy = { version = "0.5.1", features = [
+    "yaml_conf",
+], default-features = false }
 log = "0.4.17"
 pretty_env_logger = "0.4"
 serde = { version = "1.0.152", features = ["derive"] }
