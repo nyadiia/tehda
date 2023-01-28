@@ -83,7 +83,7 @@ fn main() {
             .gravity(gdk::Gravity::Center)
             .decorated(false)
             .resizable(false)
-            .focus_on_map(true)
+            .has_focus(true)
             // TODO: we probably don't actually need all events
             .events(gdk::EventMask::ALL_EVENTS_MASK)
             .build();
@@ -93,7 +93,9 @@ fn main() {
 
         gtk_layer_shell::init_for_window(&win);
 
-        gtk_layer_shell::set_layer(&win, gtk_layer_shell::Layer::Overlay);
+        gtk_layer_shell::set_layer(&win, gtk_layer_shell::Layer::Top);
+
+        gtk_layer_shell::set_keyboard_interactivity(&win, true);
 
         // set up the application's widgets
         let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
