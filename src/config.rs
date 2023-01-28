@@ -19,10 +19,10 @@ fn default_modes() -> Vec<String> {
 }
 
 fn default_width() -> i32 {
-    320
+    800
 }
 fn default_height() -> i32 {
-    200
+    450
 }
 
 fn default_keybind_quit() -> String {
