@@ -8,7 +8,11 @@ use log::trace;
 use std::ffi::OsString;
 use std::process::exit;
 
+use crate::modes::common::Entry;
+use crate::modes::drun::get_drun_entries;
+
 mod config;
+mod modes;
 
 #[derive(FromArgs)]
 /// Wayland launcher / menu program.
@@ -58,6 +62,11 @@ fn main() {
         exit(0);
     }
 
+    if config.modes.is_empty() {
+        error!("No modes specified. Try `drun`!");
+        exit(1);
+    }
+
     let app = Application::builder()
         .application_id("page.mikufan.tehda")
         .build();
@@ -78,6 +87,7 @@ fn main() {
             // TODO: we probably don't actually need all events
             .events(gdk::EventMask::ALL_EVENTS_MASK)
             .build();
+
         win.connect_key_press_event(keypress_handler_with_config(config));
         win.set_border_width(12);
 
@@ -87,8 +97,10 @@ fn main() {
 
         // set up the application's widgets
         let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        win.add(&container);
 
         let input = gtk::Entry::new();
+        input.set_icon_from_icon_name(gtk::EntryIconPosition::Primary, Some("search"));
         container.add(&input);
 
         let scrolled_window =
@@ -107,6 +119,18 @@ fn main() {
         flow_box.set_max_children_per_line(1);
         inner_box.add(&flow_box);
 
+        let mut modes: Vec<Box<dyn Fn(&str) -> Vec<Entry>>> = vec![];
+        if config.modes.contains(&"drun".to_string()) {
+            modes.push(Box::new(get_drun_entries));
+        }
+        // TODO: add more modes
+
+        // probably shouldn't happen, but a check just in case
+        if modes.is_empty() {
+            error!("No specified modes can be called.");
+            exit(1);
+        }
+
         // handle input
         input.connect_changed(move |i| {
             // empty the flowbox
@@ -117,48 +141,24 @@ fn main() {
 
             let query = i.text();
 
-            // it isn't clear from the docs, so i'll describe it here: the search
-            // returns a vector of ranks, each rank being a vector of filenames
-            // each rank is unsorted within itself, it just means that each
-            // filename in that search has the same relatedness to the query
-            // as each other
-            //
-            // TODO: it could pay off to sort within the ranks ourselves
-            gio::DesktopAppInfo::search(query.as_str())
-                .into_iter()
-                .map(|rank| {
-                    rank.into_iter()
-                        .map(|filename| gio::DesktopAppInfo::new(filename.as_str()))
-                })
-                .flatten()
-                // TODO: holy nesting, batman
-                .for_each(|result| {
-                    if let Some(info) = result {
-                        let flow_box_child = gtk::FlowBoxChild::new();
-                        let label_text = format!("{}", info.display_name());
-                        let label = gtk::Label::new(Some(label_text.as_str()));
-                        flow_box_child.add(&label);
-                        flow_box.add(&flow_box_child);
-                        flow_box_child.show();
-                        label.show();
+            let mut entries: Vec<Entry> = vec![];
 
-                        flow_box_child.connect_activate(move |_| {
-                            let exec_path = info.executable();
-                            match subprocess::Exec::cmd(exec_path).detached().join() {
-                                Ok(_) => exit(0),
-                                Err(e) => {
-                                    error!("error running command: {}", e);
-                                    exit(1);
-                                }
-                            };
-                        });
-                    }
-                });
+            for mode in &modes {
+                let mut new_entries = (mode)(query.as_str());
+                entries.append(&mut new_entries);
+            }
+
+            for entry in entries {
+                let flow_box_child = gtk::FlowBoxChild::new();
+                let label = gtk::Label::new(Some(entry.text.as_str()));
+                flow_box_child.add(&label);
+                flow_box.add(&flow_box_child);
+                flow_box_child.show();
+                label.show();
+
+                flow_box_child.connect_activate(move |_| (entry.action)());
+            }
         });
-
-        input.set_icon_from_icon_name(gtk::EntryIconPosition::Primary, Some("search"));
-
-        win.add(&container);
 
         trace!("showing window");
         win.show_all();
