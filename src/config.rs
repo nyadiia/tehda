@@ -14,10 +14,6 @@ fn make_serde_default<'a, T: Deserialize<'a>>() -> T {
     serde_yaml::from_str("{}").unwrap()
 }
 
-fn default_modes() -> Vec<String> {
-    vec!["drun".to_string()]
-}
-
 fn default_width() -> i32 {
     800
 }
@@ -43,9 +39,6 @@ impl Default for Keybinds {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
-    #[serde(default = "default_modes")]
-    pub modes: Vec<String>,
-
     #[serde(default = "default_width")]
     pub width: i32,
 

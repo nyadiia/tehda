@@ -21,9 +21,13 @@ struct Args {
     #[argh(option, short = 'c')]
     config: Option<OsString>,
 
-    /// print the config (usually the default one) and exit
-    #[argh(switch)]
-    dump_config: bool,
+    /// which modes to use, comma-separated
+    /// built-in modes are:
+    ///  - drun (run desktop apps)
+    ///  - run (run something on PATH)
+    ///  - dump_config (dump config and quit)
+    #[argh(option, short = 'm')]
+    modes: String,
 }
 
 fn keypress_handler_with_config(
@@ -51,27 +55,38 @@ fn keypress_handler_with_config(
 fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
-    let args: Args = argh::from_env();
+    let args: &mut Args = Box::leak(Box::new(argh::from_env()));
     // safety: i dont care about the leaking here. we're using the config immutably
     //         for the program's duration, so ill be damned if i dont have a &'static
-    let config = Box::leak(Box::new(config::load_config(args.config)));
-
-    if args.dump_config {
-        trace!("dumping config and exiting");
-        println!("{}", serde_yaml::to_string(config).unwrap());
-        exit(0);
-    }
-
-    if config.modes.is_empty() {
-        error!("No modes specified. Try `drun`!");
-        exit(1);
-    }
+    let config = Box::leak(Box::new(config::load_config(args.config.as_ref())));
 
     let app = Application::builder()
         .application_id("page.mikufan.tehda")
         .build();
 
     app.connect_activate(|app| {
+        // TODO: it would be cool if i could do this outside of this block
+        // since thats where it makes sense
+        // but rust
+        let modes: Vec<&str> = args.modes.split(",").collect();
+
+        if modes.contains(&"dump_config") {
+            trace!("dumping config and exiting");
+            println!("{}", serde_yaml::to_string(config).unwrap());
+            exit(0);
+        }
+
+        if modes.is_empty() {
+            error!("No modes specified. Try `drun`!");
+            exit(1);
+        }
+
+        let mut modes_generators: Vec<Box<dyn Fn(&str) -> Vec<Entry>>> = vec![];
+
+        if modes.contains(&"drun") {
+            modes_generators.push(Box::new(get_drun_entries));
+        }
+
         trace!("building window");
         // TODO: this works, but gtk starts spewing `CRITICAL`s into stdout
         let win = ApplicationWindow::builder()
@@ -121,18 +136,6 @@ fn main() {
         flow_box.set_max_children_per_line(1);
         inner_box.add(&flow_box);
 
-        let mut modes: Vec<Box<dyn Fn(&str) -> Vec<Entry>>> = vec![];
-        if config.modes.contains(&"drun".to_string()) {
-            modes.push(Box::new(get_drun_entries));
-        }
-        // TODO: add more modes
-
-        // probably shouldn't happen, but a check just in case
-        if modes.is_empty() {
-            error!("No specified modes can be called.");
-            exit(1);
-        }
-
         // handle input
         input.connect_changed(move |i| {
             // empty the flowbox
@@ -145,8 +148,8 @@ fn main() {
 
             let mut entries: Vec<Entry> = vec![];
 
-            for mode in &modes {
-                let mut new_entries = (mode)(query.as_str());
+            for generator in &modes_generators {
+                let mut new_entries = (generator)(query.as_str());
                 entries.append(&mut new_entries);
             }
 
