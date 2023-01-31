@@ -1,4 +1,5 @@
 use argh::FromArgs;
+use clap::Parser;
 use config::Config;
 use gdk::EventKey;
 use gtk::prelude::*;
@@ -14,11 +15,12 @@ use crate::modes::drun::get_drun_entries;
 mod config;
 mod modes;
 
-#[derive(FromArgs)]
 /// Wayland launcher / menu program.
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
 struct Args {
     /// path to config
-    #[argh(option, short = 'c')]
+    #[arg(short, long)]
     config: Option<OsString>,
 
     /// which modes to use, comma-separated
@@ -26,7 +28,7 @@ struct Args {
     ///  - drun (run desktop apps)
     ///  - run (run something on PATH)
     ///  - dump_config (dump config and quit)
-    #[argh(option, short = 'm')]
+    #[arg(short, long)]
     modes: String,
 }
 
@@ -55,9 +57,9 @@ fn keypress_handler_with_config(
 fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
-    let args: &mut Args = Box::leak(Box::new(argh::from_env()));
     // safety: i dont care about the leaking here. we're using the config immutably
     //         for the program's duration, so ill be damned if i dont have a &'static
+    let args: &mut Args = Box::leak(Box::new(Args::parse()));
     let config = Box::leak(Box::new(config::load_config(args.config.as_ref())));
 
     let app = Application::builder()

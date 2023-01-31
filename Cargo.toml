@@ -17,6 +17,7 @@ categories = ["gui"]
 
 [dependencies]
 argh = "0.1.10"
+clap = { version = "4.1.4", features = ["derive"] }
 confy = { version = "0.5.1", features = [
     "yaml_conf",
 ], default-features = false }
