@@ -1,7 +1,8 @@
-use argh::FromArgs;
 use clap::Parser;
 use config::Config;
+use gdk::glib::{Char, OptionArg, OptionFlags};
 use gdk::EventKey;
+use gio::prelude::ApplicationExt;
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
 use log::error;
@@ -28,7 +29,7 @@ struct Args {
     ///  - drun (run desktop apps)
     ///  - run (run something on PATH)
     ///  - dump_config (dump config and quit)
-    #[arg(short, long)]
+    #[arg(short, long, verbatim_doc_comment)]
     modes: String,
 }
 
@@ -57,14 +58,34 @@ fn keypress_handler_with_config(
 fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
-    // safety: i dont care about the leaking here. we're using the config immutably
-    //         for the program's duration, so ill be damned if i dont have a &'static
-    let args: &mut Args = Box::leak(Box::new(Args::parse()));
+    // safety: i dont care about the leaking here. we're using the config  and
+    // args immutably for the program's duration, so ill be damned if i dont
+    // have a &'static
+    let args = Box::leak(Box::new(Args::parse()));
     let config = Box::leak(Box::new(config::load_config(args.config.as_ref())));
 
     let app = Application::builder()
         .application_id("page.mikufan.tehda")
         .build();
+
+    // gtk my behated
+    app.add_main_option(
+        "modes",
+        Char::from(b'm'),
+        OptionFlags::NONE,
+        OptionArg::String,
+        "",
+        None,
+    );
+
+    app.add_main_option(
+        "config",
+        Char::from(b'c'),
+        OptionFlags::NONE,
+        OptionArg::String,
+        "",
+        None,
+    );
 
     app.connect_activate(|app| {
         // TODO: it would be cool if i could do this outside of this block
