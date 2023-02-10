@@ -1,3 +1,5 @@
+use gtk::traits::CssProviderExt;
+use gtk::CssProvider;
 use log::{trace, warn};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -71,8 +73,7 @@ fn try_load_config<P: AsRef<Path>>(path: P) -> Option<Config> {
     }
 }
 
-/// Returns the path to attempt to load the config from
-fn config_path() -> Option<PathBuf> {
+fn config_folder_path() -> Option<PathBuf> {
     env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| {
@@ -82,9 +83,69 @@ fn config_path() -> Option<PathBuf> {
                 buf
             })
         })
-        .map(|mut v| {
-            v.push("tehda/tehda.yaml");
-            v
+        .map(|v| v.join("tehda"))
+}
+
+fn config_file_path(path: &str) -> Option<PathBuf> {
+    config_folder_path().map(|v| v.join(path))
+}
+
+fn style_path() -> Option<PathBuf> {
+    config_file_path("tehda.css")
+}
+
+/// Returns the path to attempt to load the config from
+fn config_path() -> Option<PathBuf> {
+    config_file_path("tehda.yaml")
+}
+
+const DEFAULT_CSS: &[u8] = b"
+#window {
+    background-color: #000000;
+    color: #ffffff;
+    border-radius: 1rem;
+}
+#inner-box {
+    margin: 1rem;
+}
+";
+
+pub fn load_style(path: Option<String>) -> CssProvider {
+    trace!("trying to load styles");
+    if let Some(p) = path {
+        trace!("user provided style");
+        let provider = CssProvider::new();
+        match provider.load_from_path(p.as_str()) {
+            Ok(_) => return provider,
+            Err(e) => warn!("error loading styles: {}", e),
+        };
+    }
+
+    style_path()
+        .and_then(|p| {
+            let provider = CssProvider::new();
+            // TODO: gross, i hate the borrow checker
+            match provider.load_from_path(
+                p.as_os_str()
+                    .to_str()
+                    .expect("gtk-rs requires a valid unicode path to the css file"),
+            ) {
+                Ok(_) => return Some(provider),
+                Err(e) => {
+                    warn!("error loading styles: {}", e);
+                    None
+                }
+            }
+        })
+        .unwrap_or_else(|| {
+            trace!("loading default styles");
+            let provider = CssProvider::new();
+            match provider.load_from_data(DEFAULT_CSS) {
+                Ok(_) => provider,
+                Err(e) => {
+                    panic!("error loading default styles: {}", e)
+                }
+            }
         })
 }
 

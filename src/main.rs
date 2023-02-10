@@ -7,11 +7,15 @@ use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
 use log::error;
 use log::trace;
+use std::env;
 use std::ffi::OsString;
+use std::fs::read_dir;
 use std::process::exit;
 
+use crate::config::load_style;
 use crate::modes::common::Entry;
-use crate::modes::drun::{get_drun_entries, init_drun_entries};
+use crate::modes::drun::get_drun_entries;
+use crate::modes::run::get_run_entries;
 
 mod config;
 mod modes;
@@ -23,6 +27,10 @@ struct Args {
     /// path to config
     #[arg(short, long)]
     config: Option<OsString>,
+
+    /// path to css file for styling; must be valid unicode
+    #[arg(short, long)]
+    style: Option<String>,
 
     /// which modes to use, comma-separated
     /// built-in modes are:
@@ -87,6 +95,15 @@ fn main() {
         None,
     );
 
+    app.add_main_option(
+        "style",
+        Char::from(b's'),
+        OptionFlags::NONE,
+        OptionArg::String,
+        "",
+        None,
+    );
+
     app.connect_activate(|app| {
         // TODO: it would be cool if i could do this outside of this block
         // since thats where it makes sense
@@ -108,6 +125,10 @@ fn main() {
             modes_generators.push(Box::new(get_drun_entries));
         }
 
+        if modes.contains(&"run") {
+            modes_generators.push(Box::new(get_run_entries));
+        }
+
         trace!("building window");
         // TODO: this works, but gtk starts spewing `CRITICAL`s into stdout
         let win = ApplicationWindow::builder()
@@ -124,8 +145,17 @@ fn main() {
             .events(gdk::EventMask::ALL_EVENTS_MASK)
             .build();
 
+        // TODO: i shouldnt have to clone that lmao
+        let css_provider = load_style(args.style.clone());
+        let css_context = gtk::StyleContext::new();
+        css_context.add_provider(&css_provider, 1);
+
+        gdk::Screen::default().and_then(|screen| {
+            gtk::StyleContext::add_provider_for_screen(&screen, &css_provider, 0);
+            Some(())
+        });
+
         win.connect_key_press_event(keypress_handler_with_config(config));
-        win.set_border_width(12);
 
         gtk_layer_shell::init_for_window(&win);
 
@@ -133,16 +163,23 @@ fn main() {
 
         gtk_layer_shell::set_keyboard_interactivity(&win, true);
 
+        let outer_container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        outer_container.set_widget_name("window");
+        win.add(&outer_container);
+
         // set up the application's widgets
         let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        win.add(&container);
+        container.set_widget_name("inner-box");
+        outer_container.add(&container);
 
         let input = gtk::Entry::new();
+        input.set_widget_name("input");
         input.set_icon_from_icon_name(gtk::EntryIconPosition::Primary, Some("search"));
         container.add(&input);
 
         let scrolled_window =
             gtk::ScrolledWindow::new(gtk::Adjustment::NONE, gtk::Adjustment::NONE);
+        scrolled_window.set_widget_name("entries-container");
         scrolled_window.set_vexpand(true);
         container.add(&scrolled_window);
 
@@ -157,6 +194,8 @@ fn main() {
         flow_box.set_max_children_per_line(1);
         inner_box.add(&flow_box);
 
+        // was trying to figure out how to have Entries populate before a search
+        /*
         // empty the flowbox
         flow_box
             .children()
@@ -165,8 +204,8 @@ fn main() {
 
         let mut entries: Vec<Entry> = vec![];
 
-        // was trying to figure out how to have Entries populate before a search
-        /*
+
+
         for generator in &modes_generators {
             let mut new_entries = (generator)("");
             entries.append(&mut new_entries);
@@ -194,6 +233,10 @@ fn main() {
 
             let query = i.text();
 
+            if query.is_empty() {
+                return;
+            }
+
             let mut entries: Vec<Entry> = vec![];
 
             for generator in &modes_generators {
@@ -203,6 +246,7 @@ fn main() {
 
             for entry in entries {
                 let flow_box_child = gtk::FlowBoxChild::new();
+                flow_box_child.style_context().add_class("flow-box-child");
                 let label = gtk::Label::new(Some(entry.text.as_str()));
                 flow_box_child.add(&label);
                 flow_box.add(&flow_box_child);

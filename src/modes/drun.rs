@@ -1,21 +1,7 @@
-use std::{path::PathBuf, process::exit};
-
 use gdk::{glib::GString, prelude::AppInfoExt};
 use gio;
-use log::error;
 
-use super::common::Entry;
-
-/// run the executable at the given path
-fn run_executable(path: PathBuf) {
-    match subprocess::Exec::cmd(path).detached().join() {
-        Ok(_) => exit(0),
-        Err(e) => {
-            error!("error running command: {}", e);
-            exit(1);
-        }
-    }
-}
+use super::common::{run_executable, Entry};
 
 /// convert a filename to desktop app info
 fn filename_to_info(filename: GString) -> Option<gio::DesktopAppInfo> {
