@@ -32,6 +32,13 @@ fn info_to_entry(info: gio::DesktopAppInfo) -> Entry {
     }
 }
 
+// TODO: basically return what get_drun_entries would if search was empty
+// putting Entries in alphabetical and then putting last used at the top
+/*
+pub fn init_drun_entries() -> Vec<Entry> {
+    gio::DesktopAppInfo::generic_name(&self)
+}
+*/
 /// gets Entries for desktop apps available on the system (and known to gio)
 pub fn get_drun_entries(query: &str) -> Vec<Entry> {
     // it isn't clear from the docs, so i'll describe it here: the search

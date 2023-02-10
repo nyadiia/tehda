@@ -11,7 +11,7 @@ use std::ffi::OsString;
 use std::process::exit;
 
 use crate::modes::common::Entry;
-use crate::modes::drun::get_drun_entries;
+use crate::modes::drun::{get_drun_entries, init_drun_entries};
 
 mod config;
 mod modes;
@@ -92,19 +92,17 @@ fn main() {
         // since thats where it makes sense
         // but rust
         let modes: Vec<&str> = args.modes.split(",").collect();
+        let mut modes_generators: Vec<Box<dyn Fn(&str) -> Vec<Entry>>> = vec![];
 
-        if modes.contains(&"dump_config") {
+        // things that cause the program to exit first
+        if modes.is_empty() {
+            error!("No modes specified. Try `drun`!");
+            exit(1);
+        } else if modes.contains(&"dump_config") {
             trace!("dumping config and exiting");
             println!("{}", serde_yaml::to_string(config).unwrap());
             exit(0);
         }
-
-        if modes.is_empty() {
-            error!("No modes specified. Try `drun`!");
-            exit(1);
-        }
-
-        let mut modes_generators: Vec<Box<dyn Fn(&str) -> Vec<Entry>>> = vec![];
 
         if modes.contains(&"drun") {
             modes_generators.push(Box::new(get_drun_entries));
@@ -158,6 +156,33 @@ fn main() {
         flow_box.set_orientation(gtk::Orientation::Horizontal);
         flow_box.set_max_children_per_line(1);
         inner_box.add(&flow_box);
+
+        // empty the flowbox
+        flow_box
+            .children()
+            .into_iter()
+            .for_each(|c| flow_box.remove(&c));
+
+        let mut entries: Vec<Entry> = vec![];
+
+        // was trying to figure out how to have Entries populate before a search
+        /*
+        for generator in &modes_generators {
+            let mut new_entries = (generator)("");
+            entries.append(&mut new_entries);
+        }
+
+        for entry in entries {
+            let flow_box_child = gtk::FlowBoxChild::new();
+            let label = gtk::Label::new(Some(entry.text.as_str()));
+            flow_box_child.add(&label);
+            flow_box.add(&flow_box_child);
+            flow_box_child.show();
+            label.show();
+
+            flow_box_child.connect_activate(move |_| (entry.action)());
+        }
+        */
 
         // handle input
         input.connect_changed(move |i| {
