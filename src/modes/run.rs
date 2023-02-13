@@ -33,6 +33,7 @@ pub fn get_run_entries(query: &str) -> Vec<Entry> {
         .map(|f| Entry {
             text: f.0.to_string(),
             action: Box::new(move || run_executable(f.1.clone())),
+            alternate_actions: None,
         })
         .collect()
 }

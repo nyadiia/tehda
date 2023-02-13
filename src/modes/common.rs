@@ -1,9 +1,12 @@
 use log::error;
-use std::{path::PathBuf, process::exit};
+use std::{collections::HashMap, path::PathBuf, process::exit};
+
+pub type ActionFn = Box<dyn Fn() -> ()>;
 
 pub struct Entry {
     pub text: String,
-    pub action: Box<dyn Fn() -> ()>,
+    pub action: ActionFn,
+    pub alternate_actions: Option<HashMap<String, ActionFn>>,
 }
 
 /// run the executable at the given path
