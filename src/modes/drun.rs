@@ -1,9 +1,7 @@
-use std::{collections::HashMap, process::exit};
-
 use gdk::{glib::GString, prelude::AppInfoExt};
 use gio;
 
-use super::common::{run_executable, ActionFn, Entry};
+use super::common::{run_executable, Entry};
 
 /// convert a filename to desktop app info
 fn filename_to_info(filename: GString) -> Option<gio::DesktopAppInfo> {

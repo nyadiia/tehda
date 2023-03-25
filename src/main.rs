@@ -1,21 +1,16 @@
 use clap::Parser;
 use config::Config;
-use gdk::ffi::{gdk_window_set_background_rgba, GdkRGBA};
 use gdk::glib::{Char, OptionArg, OptionFlags};
 use gdk::EventKey;
 use gio::prelude::ApplicationExt;
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
-use gtk_sys::{gtk_style_set_background, GTK_STATE_NORMAL};
 use log::error;
 use log::trace;
-use std::env;
 use std::ffi::OsString;
-use std::fs::read_dir;
 use std::process::exit;
 
 use crate::config::load_style;
-use crate::modes::common::Entry;
 use crate::modes::drun::get_drun_entries;
 use crate::modes::run::get_run_entries;
 
@@ -153,12 +148,6 @@ fn main() {
             .events(gdk::EventMask::ALL_EVENTS_MASK)
             .build();
 
-        /*
-
-        unsafe {
-            gtk_style_set_background(, &win, GTK_STATE_NORMAL)
-        }*/
-
         // TODO: i shouldnt have to clone that lmao
         let css_provider = load_style(args.style.clone());
         let css_context = gtk::StyleContext::new();
@@ -262,7 +251,7 @@ fn main() {
                 match mode {
                     Mode::Drun => entries.append(&mut get_drun_entries(query.as_str()).collect()),
                     Mode::Run => entries.append(&mut get_run_entries(query.as_str()).collect()),
-                    Mode::Custom(_) => todo!(),
+                    Mode::Custom(_a) => todo!(),
                 };
             }
 
