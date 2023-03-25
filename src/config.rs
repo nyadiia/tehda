@@ -100,6 +100,9 @@ fn config_path() -> Option<PathBuf> {
 }
 
 const DEFAULT_CSS: &[u8] = b"
+* {
+    background-color: transparent;
+}
 #window {
     background-color: #000000;
     color: #ffffff;

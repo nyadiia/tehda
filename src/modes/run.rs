@@ -26,14 +26,13 @@ lazy_static! {
     static ref PATH_ENTRIES: Vec<(String, PathBuf)> = get_path_values();
 }
 
-pub fn get_run_entries(query: &str) -> Vec<Entry> {
+pub fn get_run_entries(query: &str) -> impl Iterator<Item = Entry> + '_ {
     PATH_ENTRIES
         .iter()
-        .filter(|entry| entry.0.starts_with(query))
+        .filter(move |entry| entry.0.starts_with(query))
         .map(|f| Entry {
             text: f.0.to_string(),
             action: Box::new(move || run_executable(f.1.clone())),
             alternate_actions: None,
         })
-        .collect()
 }

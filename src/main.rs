@@ -1,10 +1,12 @@
 use clap::Parser;
 use config::Config;
+use gdk::ffi::{gdk_window_set_background_rgba, GdkRGBA};
 use gdk::glib::{Char, OptionArg, OptionFlags};
 use gdk::EventKey;
 use gio::prelude::ApplicationExt;
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
+use gtk_sys::{gtk_style_set_background, GTK_STATE_NORMAL};
 use log::error;
 use log::trace;
 use std::env;
@@ -63,6 +65,12 @@ fn keypress_handler_with_config(
     }
 }
 
+enum Mode {
+    Drun,
+    Run,
+    Custom(String),
+}
+
 fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
@@ -109,7 +117,7 @@ fn main() {
         // since thats where it makes sense
         // but rust
         let modes: Vec<&str> = args.modes.split(",").collect();
-        let mut modes_generators: Vec<Box<dyn Fn(&str) -> Vec<Entry>>> = vec![];
+        let mut enabled_modes: Vec<Mode> = vec![];
 
         // things that cause the program to exit first
         if modes.is_empty() {
@@ -121,12 +129,12 @@ fn main() {
             exit(0);
         }
 
-        if modes.contains(&"drun") {
-            modes_generators.push(Box::new(get_drun_entries));
-        }
-
-        if modes.contains(&"run") {
-            modes_generators.push(Box::new(get_run_entries));
+        for mode in modes {
+            if mode == "drun" {
+                enabled_modes.push(Mode::Drun);
+            } else if mode == "run" {
+                enabled_modes.push(Mode::Run);
+            }
         }
 
         trace!("building window");
@@ -145,13 +153,23 @@ fn main() {
             .events(gdk::EventMask::ALL_EVENTS_MASK)
             .build();
 
+        /*
+
+        unsafe {
+            gtk_style_set_background(, &win, GTK_STATE_NORMAL)
+        }*/
+
         // TODO: i shouldnt have to clone that lmao
         let css_provider = load_style(args.style.clone());
         let css_context = gtk::StyleContext::new();
         css_context.add_provider(&css_provider, 1);
 
         gdk::Screen::default().and_then(|screen| {
-            gtk::StyleContext::add_provider_for_screen(&screen, &css_provider, 0);
+            gtk::StyleContext::add_provider_for_screen(
+                &screen,
+                &css_provider,
+                gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
             Some(())
         });
 
@@ -206,7 +224,8 @@ fn main() {
 
 
 
-        for generator in &modes_generators {
+        for generator in &enabled_modes
+         {
             let mut new_entries = (generator)("");
             entries.append(&mut new_entries);
         }
@@ -237,11 +256,14 @@ fn main() {
                 return;
             }
 
-            let mut entries: Vec<Entry> = vec![];
+            let mut entries = vec![];
 
-            for generator in &modes_generators {
-                let mut new_entries = (generator)(query.as_str());
-                entries.append(&mut new_entries);
+            for mode in &enabled_modes {
+                match mode {
+                    Mode::Drun => entries.append(&mut get_drun_entries(query.as_str()).collect()),
+                    Mode::Run => entries.append(&mut get_run_entries(query.as_str()).collect()),
+                    Mode::Custom(_) => todo!(),
+                };
             }
 
             for entry in entries {

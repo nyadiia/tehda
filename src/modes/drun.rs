@@ -52,7 +52,7 @@ pub fn init_drun_entries() -> Vec<Entry> {
 }
 */
 /// gets Entries for desktop apps available on the system (and known to gio)
-pub fn get_drun_entries(query: &str) -> Vec<Entry> {
+pub fn get_drun_entries(query: &str) -> impl Iterator<Item = Entry> + '_ {
     // it isn't clear from the docs, so i'll describe it here: the search
     // returns a vector of ranks, each rank being a vector of filenames
     // each rank is unsorted within itself, it just means that each
@@ -65,5 +65,4 @@ pub fn get_drun_entries(query: &str) -> Vec<Entry> {
         .flatten()
         .map(filename_to_info)
         .filter_map(|i| i.map(info_to_entry))
-        .collect()
 }
