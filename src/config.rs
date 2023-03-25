@@ -120,7 +120,7 @@ pub fn load_style(path: Option<String>) -> CssProvider {
         let provider = CssProvider::new();
         match provider.load_from_path(p.as_str()) {
             Ok(_) => return provider,
-            Err(e) => warn!("error loading styles: {}", e),
+            Err(e) => warn!("error loading styles: {e}"),
         };
     }
 
@@ -133,9 +133,9 @@ pub fn load_style(path: Option<String>) -> CssProvider {
                     .to_str()
                     .expect("gtk-rs requires a valid unicode path to the css file"),
             ) {
-                Ok(_) => return Some(provider),
+                Ok(_) => Some(provider),
                 Err(e) => {
-                    warn!("error loading styles: {}", e);
+                    warn!("error loading styles: {e}");
                     None
                 }
             }
@@ -146,7 +146,7 @@ pub fn load_style(path: Option<String>) -> CssProvider {
             match provider.load_from_data(DEFAULT_CSS) {
                 Ok(_) => provider,
                 Err(e) => {
-                    panic!("error loading default styles: {}", e)
+                    panic!("error loading default styles: {e}")
                 }
             }
         })

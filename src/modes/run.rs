@@ -6,11 +6,10 @@ fn get_path_values() -> Vec<(String, PathBuf)> {
     env::var("PATH")
         .ok()
         .map(|path| {
-            path.split(":")
-                .map(|dir_path| read_dir(dir_path).ok())
-                .flatten() // vec<directories> -> directories
+            path.split(':')
+                .filter_map(|dir_path| read_dir(dir_path).ok()) // vec<directories> -> directories
                 .flatten() // directories -> files
-                .filter_map(|f| f.ok())
+                .filter_map(Result::ok)
                 .map(|dir_entry| {
                     (
                         dir_entry.file_name().to_string_lossy().to_string(),

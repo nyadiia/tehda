@@ -1,7 +1,7 @@
 use log::error;
 use std::{collections::HashMap, path::PathBuf, process::exit};
 
-pub type ActionFn = Box<dyn Fn() -> ()>;
+pub type ActionFn = Box<dyn Fn()>;
 
 pub struct Entry {
     pub text: String,

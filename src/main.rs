@@ -9,6 +9,7 @@ use log::error;
 use log::trace;
 use std::ffi::OsString;
 use std::process::exit;
+use std::time::Instant;
 
 use crate::config::load_style;
 use crate::modes::drun::get_drun_entries;
@@ -45,15 +46,12 @@ fn keypress_handler_with_config(
     config: &Config,
 ) -> impl Fn(&ApplicationWindow, &EventKey) -> Inhibit + '_ {
     |_, keypress| {
-        match keypress.keyval().name() {
-            Some(s) => {
-                if &s == &config.keybinds.quit {
-                    exit(0)
-                }
-
-                // TODO: add more, maybe make this into a HashMap if it gets large
+        if let Some(s) = keypress.keyval().name() {
+            if s == config.keybinds.quit {
+                exit(0)
             }
-            None => {}
+
+            // TODO: add more, maybe make this into a HashMap if it gets large
         }
 
         gtk::Inhibit(false)
@@ -111,7 +109,7 @@ fn main() {
         // TODO: it would be cool if i could do this outside of this block
         // since thats where it makes sense
         // but rust
-        let modes: Vec<&str> = args.modes.split(",").collect();
+        let modes: Vec<&str> = args.modes.split(',').collect();
         let mut enabled_modes: Vec<Mode> = vec![];
 
         // things that cause the program to exit first
@@ -153,14 +151,13 @@ fn main() {
         let css_context = gtk::StyleContext::new();
         css_context.add_provider(&css_provider, 1);
 
-        gdk::Screen::default().and_then(|screen| {
+        if let Some(screen) = gdk::Screen::default() {
             gtk::StyleContext::add_provider_for_screen(
                 &screen,
                 &css_provider,
                 gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
             );
-            Some(())
-        });
+        };
 
         win.connect_key_press_event(keypress_handler_with_config(config));
 
@@ -247,6 +244,8 @@ fn main() {
 
             let mut entries = vec![];
 
+            let now = Instant::now();
+
             for mode in &enabled_modes {
                 match mode {
                     Mode::Drun => entries.append(&mut get_drun_entries(query.as_str()).collect()),
@@ -254,6 +253,12 @@ fn main() {
                     Mode::Custom(_a) => todo!(),
                 };
             }
+
+            let elapsed_time = now.elapsed();
+            log::debug!(
+                "collecting entries took {:.4}ms",
+                elapsed_time.as_secs_f64() * 1000f64
+            );
 
             for entry in entries {
                 let flow_box_child = gtk::FlowBoxChild::new();
@@ -263,6 +268,11 @@ fn main() {
                 flow_box.add(&flow_box_child);
                 flow_box_child.show();
                 label.show();
+
+                flow_box_child.connect_key_press_event(|_, _| {
+                    println!("haii");
+                    gtk::Inhibit(false)
+                });
 
                 flow_box_child.connect_activate(move |_| (entry.action)());
             }
