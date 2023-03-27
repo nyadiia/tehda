@@ -1,9 +1,9 @@
-use std::{collections::HashMap, process::exit};
+use std::{collections::HashMap, process::exit, rc::Rc};
 
 use gdk::{glib::GString, prelude::AppInfoExt};
 use gio::{self, AppLaunchContext};
 
-use super::common::{run_executable, ActionFn, Entry};
+use super::common::{run_executable, Entry};
 
 /// convert a filename to desktop app info
 fn filename_to_info(filename: GString) -> Option<gio::DesktopAppInfo> {
@@ -35,7 +35,11 @@ fn info_to_alternate_actions(info: gio::DesktopAppInfo) -> Option<HashMap<String
     }
 }*/
 
-fn run_alternate_action(info: gio::DesktopAppInfo, a: GString) -> Box<dyn Fn()> {
+fn default_action(info: Rc<gio::DesktopAppInfo>) -> Box<dyn Fn()> {
+    Box::new(move || run_executable(info.executable()))
+}
+
+fn run_alternate_action(info: Rc<gio::DesktopAppInfo>, a: GString) -> Box<dyn Fn()> {
     Box::new(move || {
         info.launch_action(a.as_str(), AppLaunchContext::NONE);
         exit(0)
@@ -44,14 +48,15 @@ fn run_alternate_action(info: gio::DesktopAppInfo, a: GString) -> Box<dyn Fn()> 
 
 /// convert desktop app info to an Entry
 fn info_to_entry(info: gio::DesktopAppInfo) -> Entry {
-    let i = info.clone();
+    let info = Rc::new(info);
     Entry {
         text: info.display_name().to_string(),
-        action: Box::new(move || run_executable(info.executable())),
+        action: default_action(info.clone()),
         alternate_actions: Some(HashMap::from_iter(
-            i.list_actions()
+            info.clone()
+                .list_actions()
                 .into_iter()
-                .map(|a| (a.to_string(), run_alternate_action(i.clone(), a))),
+                .map(|a| (a.to_string(), run_alternate_action(info.clone(), a))),
         )),
         open: false,
     }

@@ -58,6 +58,18 @@ pub struct Config {
     pub keybinds: Keybinds,
 }
 
+impl Config {
+    /// Serializes the config to a string.
+    ///
+    /// This is required due to `lazy_static` wrapping the type, causing it
+    /// to not be `Serialize` when we need to serialize it in `main`.
+    pub fn serialize(&self) -> String {
+        // safety: this is safe to unwrap, since the config must be valid
+        // for it to exist
+        serde_yaml::to_string(self).unwrap()
+    }
+}
+
 /// Try to load the config from a file.
 fn try_load_config<P: AsRef<Path>>(path: P) -> Option<Config> {
     trace!("trying to load config from `{:?}`", path.as_ref());
@@ -120,7 +132,7 @@ const DEFAULT_CSS: &[u8] = b"
 }
 ";
 
-pub fn load_style(path: Option<String>) -> CssProvider {
+pub fn load_style(path: &Option<String>) -> CssProvider {
     trace!("trying to load styles");
     if let Some(p) = path {
         trace!("user provided style");

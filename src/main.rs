@@ -8,11 +8,8 @@ use gtk::{Application, ApplicationWindow};
 use log::error;
 use log::trace;
 use modes::common::Entry;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::process::exit;
-use std::rc::Rc;
 use std::time::Instant;
 
 use crate::config::load_style;
@@ -43,6 +40,11 @@ struct Args {
     modes: String,
 }
 
+lazy_static::lazy_static! {
+    static ref ARGS: Args = Args::parse();
+    static ref CONFIG: Config = config::load_config(ARGS.config.as_ref());
+}
+
 fn is_key(keypress: &EventKey, desired: &String) -> bool {
     if let Some(s) = keypress.keyval().name() {
         if &s.to_string() == desired {
@@ -52,20 +54,17 @@ fn is_key(keypress: &EventKey, desired: &String) -> bool {
     return false;
 }
 
-fn keypress_handler_with_config(
-    // <autumn>: if i change [this type] to a ref it gets mad about me moving the value
-    //           in there and then has a whole bunch of lifetime bullshit going on
-    // <ash>: THIS is the point of leaking! autumn im gonna leak just for you
-    config: &Config,
-) -> impl Fn(&ApplicationWindow, &EventKey) -> Inhibit + '_ {
-    |_, keypress| {
-        // TODO: add more, maybe make this into a HashMap if it gets large
-        if is_key(keypress, &config.keybinds.quit) {
-            exit(0)
-        }
+// keeping this exchange here for posterity despite it being outdated:
+// <autumn>: if i change [this type] to a ref it gets mad about me moving the value
+//           in there and then has a whole bunch of lifetime bullshit going on
+// <ash>: THIS is the point of leaking! autumn im gonna leak just for you
 
-        gtk::Inhibit(false)
+fn keypress_handler_with_config(keypress: &EventKey) -> Inhibit {
+    if is_key(keypress, &CONFIG.keybinds.quit) {
+        exit(0)
     }
+
+    gtk::Inhibit(false)
 }
 
 enum Mode {
@@ -107,28 +106,18 @@ fn make_entry(flow_box: &gtk::FlowBox, entry: Entry) {
             l.show();
         }
     } else {
+        let container = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        container.show();
+        flow_box_child.add(&container);
+
         let label = gtk::Label::new(Some(entry.text.as_str()));
-        flow_box_child.add(&label);
+        container.add(&label);
         label.show();
     }
 
     flow_box_child.show();
 
     flow_box_child.connect_activate(move |_| (entry.action)());
-
-    // flow_box_child.connect_key_press_event(move |flow_box_child, keypress| {
-    //     if let Some(k) = keypress.keyval().name() {
-    //         let mut oe = open_entries.borrow_mut();
-    //         if k == "Right".to_string() && !oe.contains(flow_box_child) {
-    //             if let Some(actions) = &entry.alternate_actions {
-    //                 oe.insert(flow_box_child.clone());
-    //                 open_alternate_actions(&item_container, actions);
-    //             };
-    //         };
-    //     };
-
-    //     gtk::Inhibit(false)
-    // });
 }
 
 fn handle_input(i: &gtk::Entry, flow_box: &gtk::FlowBox, modes: &Vec<Mode>) {
@@ -171,11 +160,6 @@ fn handle_input(i: &gtk::Entry, flow_box: &gtk::FlowBox, modes: &Vec<Mode>) {
 fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
-    // safety: i dont care about the leaking here. we're using the config  and
-    // args immutably for the program's duration, so ill be damned if i dont
-    // have a &'static
-    let args = Box::leak(Box::new(Args::parse()));
-    let config = Box::leak(Box::new(config::load_config(args.config.as_ref())));
 
     let app = Application::builder()
         .application_id("page.mikufan.tehda")
@@ -209,37 +193,28 @@ fn main() {
         None,
     );
 
-    app.connect_activate(|app| {
-        // TODO: it would be cool if i could do this outside of this block
-        // since thats where it makes sense
-        // but rust
-        let modes: Vec<&str> = args.modes.split(',').collect();
-        let mut enabled_modes: Vec<Mode> = vec![];
+    // TODO: it would be cool if i could do this outside of this block
+    // since thats where it makes sense
+    // but rust
+    let modes: Vec<&str> = ARGS.modes.split(',').collect();
 
-        // things that cause the program to exit first
-        if modes.is_empty() {
-            error!("No modes specified. Try `drun`!");
-            exit(1);
-        } else if modes.contains(&"dump_config") {
-            trace!("dumping config and exiting");
-            println!("{}", serde_yaml::to_string(config).unwrap());
-            exit(0);
-        }
+    // things that cause the program to exit first
+    if modes.is_empty() {
+        error!("No modes specified. Try `drun`!");
+        exit(1);
+    } else if modes.contains(&"dump_config") {
+        trace!("dumping config and exiting");
+        println!("{}", CONFIG.serialize());
+        exit(0);
+    }
 
-        for mode in modes {
-            if mode == "drun" {
-                enabled_modes.push(Mode::Drun);
-            } else if mode == "run" {
-                enabled_modes.push(Mode::Run);
-            }
-        }
-
+    app.connect_activate(move |app| {
         trace!("building window");
         // TODO: this works, but gtk starts spewing `CRITICAL`s into stdout
         let win = ApplicationWindow::builder()
             .application(app)
-            .default_width(config.width)
-            .default_height(config.height)
+            .default_width(CONFIG.width)
+            .default_height(CONFIG.height)
             .title("tehda")
             .window_position(gtk::WindowPosition::None)
             .gravity(gdk::Gravity::Center)
@@ -250,8 +225,7 @@ fn main() {
             .events(gdk::EventMask::ALL_EVENTS_MASK)
             .build();
 
-        // TODO: i shouldnt have to clone that lmao
-        let css_provider = load_style(args.style.clone());
+        let css_provider = load_style(&ARGS.style);
         let css_context = gtk::StyleContext::new();
         css_context.add_provider(&css_provider, 1);
 
@@ -263,7 +237,7 @@ fn main() {
             );
         };
 
-        win.connect_key_press_event(keypress_handler_with_config(config));
+        win.connect_key_press_event(|_, keypress| keypress_handler_with_config(keypress));
 
         gtk_layer_shell::init_for_window(&win);
 
@@ -302,35 +276,14 @@ fn main() {
         flow_box.set_max_children_per_line(1);
         inner_box.add(&flow_box);
 
-        // was trying to figure out how to have Entries populate before a search
-        /*
-        // empty the flowbox
-        flow_box
-            .children()
-            .into_iter()
-            .for_each(|c| flow_box.remove(&c));
-
-        let mut entries: Vec<Entry> = vec![];
-
-
-
-        for generator in &enabled_modes
-         {
-            let mut new_entries = (generator)("");
-            entries.append(&mut new_entries);
-        }
-
-        for entry in entries {
-            let flow_box_child = gtk::FlowBoxChild::new();
-            let label = gtk::Label::new(Some(entry.text.as_str()));
-            flow_box_child.add(&label);
-            flow_box.add(&flow_box_child);
-            flow_box_child.show();
-            label.show();
-
-            flow_box_child.connect_activate(move |_| (entry.action)());
-        }
-        */
+        let enabled_modes = modes
+            .iter()
+            .filter_map(|mode| match mode {
+                &"drun" => Some(Mode::Drun),
+                &"run" => Some(Mode::Run),
+                _ => None,
+            })
+            .collect();
 
         // handle input
         input.connect_changed(move |i| {
