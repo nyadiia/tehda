@@ -1,7 +1,7 @@
 use gdk::glib::{Char, OptionArg, OptionFlags};
 use gtk::prelude::*;
 
-use crate::{input::handle_input, modes::common::Mode};
+use crate::{input::handle, modes::common::Mode};
 
 /// Set up the window.
 pub fn make_window_tree(win: &gtk::ApplicationWindow, enabled_modes: Vec<Mode>) {
@@ -40,36 +40,25 @@ pub fn make_window_tree(win: &gtk::ApplicationWindow, enabled_modes: Vec<Mode>) 
 
     // handle input
     input.connect_changed(move |i| {
-        handle_input(i, &flow_box, &enabled_modes);
+        handle(i, &flow_box, &enabled_modes);
     });
 }
 
+const GTK_ARGS: [(&str, u8); 3] = [("modes", b'm'), ("config", b'c'), ("style", b's')];
+
 /// GTK hates it when you don't do options through their system. This sucks.
 pub fn tell_gtk_about_options(app: &gtk::Application) {
-    app.add_main_option(
-        "modes",
-        Char::from(b'm'),
-        OptionFlags::NONE,
-        OptionArg::String,
-        "",
-        None,
-    );
-
-    app.add_main_option(
-        "config",
-        Char::from(b'c'),
-        OptionFlags::NONE,
-        OptionArg::String,
-        "",
-        None,
-    );
-
-    app.add_main_option(
-        "style",
-        Char::from(b's'),
-        OptionFlags::NONE,
-        OptionArg::String,
-        "",
-        None,
-    );
+    GTK_ARGS
+        .into_iter()
+        .map(|(l, c)| (l, Char::from(c)))
+        .for_each(|(long_name, short_name)| {
+            app.add_main_option(
+                long_name,
+                short_name,
+                OptionFlags::NONE,
+                OptionArg::String,
+                "",
+                None,
+            );
+        });
 }

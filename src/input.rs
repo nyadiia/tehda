@@ -54,8 +54,7 @@ fn make_entry(flow_box: &gtk::FlowBox, entry: Entry) {
     flow_box_child.connect_activate(move |_| (entry.action)());
 }
 
-#[allow(clippy::module_name_repetitions)] // `handle` would be a weird name
-pub fn handle_input(i: &gtk::Entry, flow_box: &gtk::FlowBox, modes: &Vec<Mode>) {
+pub fn handle(i: &gtk::Entry, flow_box: &gtk::FlowBox, modes: &Vec<Mode>) {
     // empty the flowbox
     flow_box
         .children()

@@ -1,22 +1,18 @@
 use clap::Parser;
-use config::Config;
+use config::{load_config, Config};
 use gio::prelude::ApplicationExt;
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow};
-use log::error;
-use log::trace;
-use std::ffi::OsString;
-use std::process::exit;
+use log::{error, trace};
+use std::{ffi::OsString, process::exit};
 
-use crate::config::load_style;
 use crate::modes::common::Mode;
-use crate::setup::{make_window_tree, tell_gtk_about_options};
 
 mod config;
 mod input;
 mod modes;
 mod setup;
 
+// if you add more args, add them to `setup.rs` in `GTK_ARGS`
 /// Wayland launcher / menu program.
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -40,19 +36,19 @@ struct Args {
 
 lazy_static::lazy_static! {
     static ref ARGS: Args = Args::parse();
-    static ref CONFIG: Config = config::load_config(ARGS.config.as_ref());
+    static ref CONFIG: Config = load_config(ARGS.config.as_ref());
 }
 
 fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
 
-    let app = Application::builder()
+    let app = gtk::Application::builder()
         .application_id("page.mikufan.tehda")
         .build();
 
     // gtk my behated
-    tell_gtk_about_options(&app);
+    setup::tell_gtk_about_options(&app);
 
     let modes: Vec<&str> = ARGS.modes.split(',').collect();
 
@@ -68,7 +64,7 @@ fn main() {
     app.connect_activate(move |app| {
         trace!("building window");
         // TODO: this works, but gtk starts spewing `CRITICAL`s into stdout
-        let win = ApplicationWindow::builder()
+        let win = gtk::ApplicationWindow::builder()
             .application(app)
             .default_width(CONFIG.width)
             .default_height(CONFIG.height)
@@ -88,7 +84,7 @@ fn main() {
         gtk_layer_shell::set_keyboard_interactivity(&win, true);
 
         // apply styles
-        let css_provider = load_style(&ARGS.style);
+        let css_provider = config::load_style(&ARGS.style);
         let css_context = gtk::StyleContext::new();
         css_context.add_provider(&css_provider, 1);
 
@@ -124,7 +120,7 @@ fn main() {
             })
             .collect();
 
-        make_window_tree(&win, enabled_modes);
+        setup::make_window_tree(&win, enabled_modes);
 
         trace!("showing window");
         win.show_all();

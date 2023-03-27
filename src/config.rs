@@ -1,10 +1,11 @@
-use gtk::traits::CssProviderExt;
-use gtk::CssProvider;
+use gtk::{traits::CssProviderExt, CssProvider};
 use log::{trace, warn};
 use serde::{Deserialize, Serialize};
-use std::env;
-use std::fmt::Debug;
-use std::path::{Path, PathBuf};
+use std::{
+    env,
+    fmt::Debug,
+    path::{Path, PathBuf},
+};
 
 /// Returns the default object as parsed by Serde.
 /// Requires all fields on the object to either 1. have a #[serde(default)] or
