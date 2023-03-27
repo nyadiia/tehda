@@ -74,72 +74,61 @@ enum Mode {
     Custom(String),
 }
 
-fn open_alternate_actions(item_container: &gtk::Box, actions: &HashMap<String, Box<dyn Fn()>>) {
-    let flow_box = gtk::FlowBox::new();
-    flow_box.set_orientation(gtk::Orientation::Vertical);
-    flow_box.set_max_children_per_line(1);
-    for action in actions {
-        let flow_box_child = gtk::FlowBoxChild::new();
-
-        flow_box_child.style_context().add_class("flow-box-child");
-
-        let l = gtk::Label::new(Some(action.0.as_str()));
-        l.show();
-        flow_box_child.add(&l);
-        flow_box.add(&flow_box_child);
-        flow_box_child.show();
-        flow_box_child.connect_activate(move |_| {
-            //(action.1)();
-            exit(0);
-        });
-        l.show();
-    }
-    item_container.add(&flow_box);
-    flow_box.show();
-    flow_box.grab_focus();
-}
-
-fn make_entry(
-    open_entries: &Rc<RefCell<HashSet<gtk::FlowBoxChild>>>,
-    flow_box: &gtk::FlowBox,
-    entry: Entry,
-) {
-    let open_entries = open_entries.clone();
-
+fn make_entry(flow_box: &gtk::FlowBox, entry: Entry) {
     let flow_box_child = gtk::FlowBoxChild::new();
     flow_box_child.style_context().add_class("flow-box-child");
-    let item_container = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let left = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-    item_container.add(&left);
-    left.show();
-    flow_box_child.add(&item_container);
-    let label = gtk::Label::new(Some(entry.text.as_str()));
-    if entry.alternate_actions.is_some() {
-        let arrow = gtk::Label::new(Some("+"));
-        left.add(&arrow);
-        arrow.show();
-    }
-    left.add(&label);
     flow_box.add(&flow_box_child);
-    item_container.show();
-    label.show();
+
+    if let Some(actions) = entry.alternate_actions {
+        let expander = gtk::Expander::new(Some(entry.text.as_str()));
+        flow_box_child.add(&expander);
+        expander.show();
+
+        let flow_box = gtk::FlowBox::new();
+        flow_box.set_orientation(gtk::Orientation::Vertical);
+        flow_box.set_max_children_per_line(1);
+        expander.add(&flow_box);
+        flow_box.show();
+
+        for action in actions {
+            let flow_box_child = gtk::FlowBoxChild::new();
+
+            flow_box_child.style_context().add_class("flow-box-child");
+
+            let l = gtk::Label::new(Some(action.0.as_str()));
+            l.show();
+            flow_box_child.add(&l);
+            flow_box.add(&flow_box_child);
+            flow_box_child.show();
+            flow_box_child.connect_activate(move |_| {
+                (action.1)();
+                exit(0);
+            });
+            l.show();
+        }
+    } else {
+        let label = gtk::Label::new(Some(entry.text.as_str()));
+        flow_box_child.add(&label);
+        label.show();
+    }
+
     flow_box_child.show();
 
     flow_box_child.connect_activate(move |_| (entry.action)());
 
-    flow_box_child.connect_key_press_event(move |flow_box_child, keypress| {
-        if let Some(k) = keypress.keyval().name() {
-            let mut oe = open_entries.borrow_mut();
-            if k == "Right".to_string() && !oe.contains(flow_box_child) {
-                if let Some(actions) = &entry.alternate_actions {
-                    oe.insert(flow_box_child.clone());
-                    open_alternate_actions(&item_container, actions);
-                };
-            };
-        };
+    // flow_box_child.connect_key_press_event(move |flow_box_child, keypress| {
+    //     if let Some(k) = keypress.keyval().name() {
+    //         let mut oe = open_entries.borrow_mut();
+    //         if k == "Right".to_string() && !oe.contains(flow_box_child) {
+    //             if let Some(actions) = &entry.alternate_actions {
+    //                 oe.insert(flow_box_child.clone());
+    //                 open_alternate_actions(&item_container, actions);
+    //             };
+    //         };
+    //     };
 
-        gtk::Inhibit(false)
-    });
+    //     gtk::Inhibit(false)
+    // });
 }
 
 fn handle_input(i: &gtk::Entry, flow_box: &gtk::FlowBox, modes: &Vec<Mode>) {
@@ -172,10 +161,10 @@ fn handle_input(i: &gtk::Entry, flow_box: &gtk::FlowBox, modes: &Vec<Mode>) {
         elapsed_time.as_secs_f64() * 1000f64
     );
 
-    let open_entries = Rc::new(RefCell::new(HashSet::new()));
+    // let open_entries = Rc::new(RefCell::new(HashSet::new()));
 
     for entry in entries {
-        make_entry(&open_entries, flow_box, entry);
+        make_entry(flow_box, entry);
     }
 }
 
