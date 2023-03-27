@@ -25,13 +25,17 @@ lazy_static! {
     static ref PATH_ENTRIES: Vec<(String, PathBuf)> = get_path_values();
 }
 
+const MAX_RUN_ENTRIES: usize = 100;
+
 pub fn get_run_entries(query: &str) -> impl Iterator<Item = Entry> + '_ {
     PATH_ENTRIES
         .iter()
         .filter(move |entry| entry.0.starts_with(query))
+        .take(MAX_RUN_ENTRIES)
         .map(|f| Entry {
             text: f.0.to_string(),
             action: Box::new(move || run_executable(f.1.clone())),
             alternate_actions: None,
+            open: false,
         })
 }

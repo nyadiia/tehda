@@ -1,7 +1,9 @@
-use gdk::{glib::GString, prelude::AppInfoExt};
-use gio;
+use std::{collections::HashMap, process::exit};
 
-use super::common::{run_executable, Entry};
+use gdk::{glib::GString, prelude::AppInfoExt};
+use gio::{self, AppLaunchContext};
+
+use super::common::{run_executable, ActionFn, Entry};
 
 /// convert a filename to desktop app info
 fn filename_to_info(filename: GString) -> Option<gio::DesktopAppInfo> {
@@ -33,12 +35,25 @@ fn info_to_alternate_actions(info: gio::DesktopAppInfo) -> Option<HashMap<String
     }
 }*/
 
+fn run_alternate_action(info: gio::DesktopAppInfo, a: GString) -> Box<dyn Fn()> {
+    Box::new(move || {
+        info.launch_action(a.as_str(), AppLaunchContext::NONE);
+        exit(0)
+    })
+}
+
 /// convert desktop app info to an Entry
 fn info_to_entry(info: gio::DesktopAppInfo) -> Entry {
+    let i = info.clone();
     Entry {
         text: info.display_name().to_string(),
         action: Box::new(move || run_executable(info.executable())),
-        alternate_actions: None,
+        alternate_actions: Some(HashMap::from_iter(
+            i.list_actions()
+                .into_iter()
+                .map(|a| (a.to_string(), run_alternate_action(i.clone(), a))),
+        )),
+        open: false,
     }
 }
 
@@ -49,6 +64,9 @@ pub fn init_drun_entries() -> Vec<Entry> {
     gio::DesktopAppInfo::generic_name(&self)
 }
 */
+
+const MAX_DRUN_ENTRIES: usize = 100;
+
 /// gets Entries for desktop apps available on the system (and known to gio)
 pub fn get_drun_entries(query: &str) -> impl Iterator<Item = Entry> + '_ {
     // it isn't clear from the docs, so i'll describe it here: the search
@@ -61,6 +79,7 @@ pub fn get_drun_entries(query: &str) -> impl Iterator<Item = Entry> + '_ {
     gio::DesktopAppInfo::search(query)
         .into_iter()
         .flatten()
+        .take(MAX_DRUN_ENTRIES)
         .map(filename_to_info)
         .filter_map(|i| i.map(info_to_entry))
 }

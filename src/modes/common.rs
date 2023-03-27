@@ -7,6 +7,7 @@ pub struct Entry {
     pub text: String,
     pub action: ActionFn,
     pub alternate_actions: Option<HashMap<String, ActionFn>>,
+    pub open: bool,
 }
 
 /// run the executable at the given path

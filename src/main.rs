@@ -7,8 +7,12 @@ use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
 use log::error;
 use log::trace;
+use modes::common::Entry;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::process::exit;
+use std::rc::Rc;
 use std::time::Instant;
 
 use crate::config::load_style;
@@ -39,6 +43,15 @@ struct Args {
     modes: String,
 }
 
+fn is_key(keypress: &EventKey, desired: &String) -> bool {
+    if let Some(s) = keypress.keyval().name() {
+        if &s.to_string() == desired {
+            return true;
+        }
+    }
+    return false;
+}
+
 fn keypress_handler_with_config(
     // <autumn>: if i change [this type] to a ref it gets mad about me moving the value
     //           in there and then has a whole bunch of lifetime bullshit going on
@@ -46,12 +59,9 @@ fn keypress_handler_with_config(
     config: &Config,
 ) -> impl Fn(&ApplicationWindow, &EventKey) -> Inhibit + '_ {
     |_, keypress| {
-        if let Some(s) = keypress.keyval().name() {
-            if s == config.keybinds.quit {
-                exit(0)
-            }
-
-            // TODO: add more, maybe make this into a HashMap if it gets large
+        // TODO: add more, maybe make this into a HashMap if it gets large
+        if is_key(keypress, &config.keybinds.quit) {
+            exit(0)
         }
 
         gtk::Inhibit(false)
@@ -62,6 +72,111 @@ enum Mode {
     Drun,
     Run,
     Custom(String),
+}
+
+fn open_alternate_actions(item_container: &gtk::Box, actions: &HashMap<String, Box<dyn Fn()>>) {
+    let flow_box = gtk::FlowBox::new();
+    flow_box.set_orientation(gtk::Orientation::Vertical);
+    flow_box.set_max_children_per_line(1);
+    for action in actions {
+        let flow_box_child = gtk::FlowBoxChild::new();
+
+        flow_box_child.style_context().add_class("flow-box-child");
+
+        let l = gtk::Label::new(Some(action.0.as_str()));
+        l.show();
+        flow_box_child.add(&l);
+        flow_box.add(&flow_box_child);
+        flow_box_child.show();
+        flow_box_child.connect_activate(move |_| {
+            //(action.1)();
+            exit(0);
+        });
+        l.show();
+    }
+    item_container.add(&flow_box);
+    flow_box.show();
+    flow_box.grab_focus();
+}
+
+fn make_entry(
+    open_entries: &Rc<RefCell<HashSet<gtk::FlowBoxChild>>>,
+    flow_box: &gtk::FlowBox,
+    entry: Entry,
+) {
+    let open_entries = open_entries.clone();
+
+    let flow_box_child = gtk::FlowBoxChild::new();
+    flow_box_child.style_context().add_class("flow-box-child");
+    let item_container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let left = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    item_container.add(&left);
+    left.show();
+    flow_box_child.add(&item_container);
+    let label = gtk::Label::new(Some(entry.text.as_str()));
+    if entry.alternate_actions.is_some() {
+        let arrow = gtk::Label::new(Some("+"));
+        left.add(&arrow);
+        arrow.show();
+    }
+    left.add(&label);
+    flow_box.add(&flow_box_child);
+    item_container.show();
+    label.show();
+    flow_box_child.show();
+
+    flow_box_child.connect_activate(move |_| (entry.action)());
+
+    flow_box_child.connect_key_press_event(move |flow_box_child, keypress| {
+        if let Some(k) = keypress.keyval().name() {
+            let mut oe = open_entries.borrow_mut();
+            if k == "Right".to_string() && !oe.contains(flow_box_child) {
+                if let Some(actions) = &entry.alternate_actions {
+                    oe.insert(flow_box_child.clone());
+                    open_alternate_actions(&item_container, actions);
+                };
+            };
+        };
+
+        gtk::Inhibit(false)
+    });
+}
+
+fn handle_input(i: &gtk::Entry, flow_box: &gtk::FlowBox, modes: &Vec<Mode>) {
+    // empty the flowbox
+    flow_box
+        .children()
+        .into_iter()
+        .for_each(|c| flow_box.remove(&c));
+
+    // get query
+    let query = i.text();
+    if query.is_empty() {
+        return;
+    }
+
+    // get the entries to render
+    let mut entries = vec![];
+
+    let now = Instant::now();
+    for mode in modes {
+        match mode {
+            Mode::Drun => entries.append(&mut get_drun_entries(query.as_str()).collect()),
+            Mode::Run => entries.append(&mut get_run_entries(query.as_str()).collect()),
+            Mode::Custom(_a) => todo!(),
+        };
+    }
+    let elapsed_time = now.elapsed();
+    log::debug!(
+        "collecting entries took {:.4}ms",
+        elapsed_time.as_secs_f64() * 1000f64
+    );
+
+    let open_entries = Rc::new(RefCell::new(HashSet::new()));
+
+    for entry in entries {
+        make_entry(&open_entries, flow_box, entry);
+    }
 }
 
 fn main() {
@@ -230,52 +345,7 @@ fn main() {
 
         // handle input
         input.connect_changed(move |i| {
-            // empty the flowbox
-            flow_box
-                .children()
-                .into_iter()
-                .for_each(|c| flow_box.remove(&c));
-
-            let query = i.text();
-
-            if query.is_empty() {
-                return;
-            }
-
-            let mut entries = vec![];
-
-            let now = Instant::now();
-
-            for mode in &enabled_modes {
-                match mode {
-                    Mode::Drun => entries.append(&mut get_drun_entries(query.as_str()).collect()),
-                    Mode::Run => entries.append(&mut get_run_entries(query.as_str()).collect()),
-                    Mode::Custom(_a) => todo!(),
-                };
-            }
-
-            let elapsed_time = now.elapsed();
-            log::debug!(
-                "collecting entries took {:.4}ms",
-                elapsed_time.as_secs_f64() * 1000f64
-            );
-
-            for entry in entries {
-                let flow_box_child = gtk::FlowBoxChild::new();
-                flow_box_child.style_context().add_class("flow-box-child");
-                let label = gtk::Label::new(Some(entry.text.as_str()));
-                flow_box_child.add(&label);
-                flow_box.add(&flow_box_child);
-                flow_box_child.show();
-                label.show();
-
-                flow_box_child.connect_key_press_event(|_, _| {
-                    println!("haii");
-                    gtk::Inhibit(false)
-                });
-
-                flow_box_child.connect_activate(move |_| (entry.action)());
-            }
+            handle_input(i, &flow_box, &enabled_modes);
         });
 
         trace!("showing window");

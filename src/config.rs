@@ -23,6 +23,10 @@ fn default_height() -> i32 {
     450
 }
 
+fn default_keybind_open_alternate_actions() -> String {
+    "Right".to_string()
+}
+
 fn default_keybind_quit() -> String {
     "Escape".to_string()
 }
@@ -31,6 +35,9 @@ fn default_keybind_quit() -> String {
 pub struct Keybinds {
     #[serde(default = "default_keybind_quit")]
     pub quit: String,
+
+    #[serde(default = "default_keybind_open_alternate_actions")]
+    pub open_alternate_actions: String,
 }
 
 impl Default for Keybinds {
