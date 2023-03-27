@@ -30,7 +30,6 @@ fn make_entry(flow_box: &gtk::FlowBox, entry: Entry) {
             flow_box_child.style_context().add_class("flow-box-child");
 
             let l = gtk::Label::new(Some(action.0.as_str()));
-            l.show();
             flow_box_child.add(&l);
             flow_box.add(&flow_box_child);
             flow_box_child.show();
