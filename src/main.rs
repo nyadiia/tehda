@@ -1,23 +1,21 @@
 use clap::Parser;
 use config::Config;
-use gdk::glib::{Char, OptionArg, OptionFlags};
-use gdk::EventKey;
 use gio::prelude::ApplicationExt;
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow};
 use log::error;
 use log::trace;
-use modes::common::Entry;
 use std::ffi::OsString;
 use std::process::exit;
-use std::time::Instant;
 
 use crate::config::load_style;
-use crate::modes::drun::get_drun_entries;
-use crate::modes::run::get_run_entries;
+use crate::modes::common::Mode;
+use crate::setup::{make_window_tree, tell_gtk_about_options};
 
 mod config;
+mod input;
 mod modes;
+mod setup;
 
 /// Wayland launcher / menu program.
 #[derive(Parser)]
@@ -45,118 +43,6 @@ lazy_static::lazy_static! {
     static ref CONFIG: Config = config::load_config(ARGS.config.as_ref());
 }
 
-fn is_key(keypress: &EventKey, desired: &String) -> bool {
-    if let Some(s) = keypress.keyval().name() {
-        if &s.to_string() == desired {
-            return true;
-        }
-    }
-    return false;
-}
-
-// keeping this exchange here for posterity despite it being outdated:
-// <autumn>: if i change [this type] to a ref it gets mad about me moving the value
-//           in there and then has a whole bunch of lifetime bullshit going on
-// <ash>: THIS is the point of leaking! autumn im gonna leak just for you
-
-fn keypress_handler_with_config(keypress: &EventKey) -> Inhibit {
-    if is_key(keypress, &CONFIG.keybinds.quit) {
-        exit(0)
-    }
-
-    gtk::Inhibit(false)
-}
-
-enum Mode {
-    Drun,
-    Run,
-    Custom(String),
-}
-
-fn make_entry(flow_box: &gtk::FlowBox, entry: Entry) {
-    let flow_box_child = gtk::FlowBoxChild::new();
-    flow_box_child.style_context().add_class("flow-box-child");
-    flow_box.add(&flow_box_child);
-
-    if let Some(actions) = entry.alternate_actions {
-        let expander = gtk::Expander::new(Some(entry.text.as_str()));
-        flow_box_child.add(&expander);
-        expander.show();
-
-        let flow_box = gtk::FlowBox::new();
-        flow_box.set_orientation(gtk::Orientation::Vertical);
-        flow_box.set_max_children_per_line(1);
-        expander.add(&flow_box);
-        flow_box.show();
-
-        for action in actions {
-            let flow_box_child = gtk::FlowBoxChild::new();
-
-            flow_box_child.style_context().add_class("flow-box-child");
-
-            let l = gtk::Label::new(Some(action.0.as_str()));
-            l.show();
-            flow_box_child.add(&l);
-            flow_box.add(&flow_box_child);
-            flow_box_child.show();
-            flow_box_child.connect_activate(move |_| {
-                (action.1)();
-                exit(0);
-            });
-            l.show();
-        }
-    } else {
-        let container = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        container.show();
-        flow_box_child.add(&container);
-
-        let label = gtk::Label::new(Some(entry.text.as_str()));
-        container.add(&label);
-        label.show();
-    }
-
-    flow_box_child.show();
-
-    flow_box_child.connect_activate(move |_| (entry.action)());
-}
-
-fn handle_input(i: &gtk::Entry, flow_box: &gtk::FlowBox, modes: &Vec<Mode>) {
-    // empty the flowbox
-    flow_box
-        .children()
-        .into_iter()
-        .for_each(|c| flow_box.remove(&c));
-
-    // get query
-    let query = i.text();
-    if query.is_empty() {
-        return;
-    }
-
-    // get the entries to render
-    let mut entries = vec![];
-
-    let now = Instant::now();
-    for mode in modes {
-        match mode {
-            Mode::Drun => entries.append(&mut get_drun_entries(query.as_str()).collect()),
-            Mode::Run => entries.append(&mut get_run_entries(query.as_str()).collect()),
-            Mode::Custom(_a) => todo!(),
-        };
-    }
-    let elapsed_time = now.elapsed();
-    log::debug!(
-        "collecting entries took {:.4}ms",
-        elapsed_time.as_secs_f64() * 1000f64
-    );
-
-    // let open_entries = Rc::new(RefCell::new(HashSet::new()));
-
-    for entry in entries {
-        make_entry(flow_box, entry);
-    }
-}
-
 fn main() {
     pretty_env_logger::init();
     trace!("starting tehda");
@@ -166,39 +52,10 @@ fn main() {
         .build();
 
     // gtk my behated
-    app.add_main_option(
-        "modes",
-        Char::from(b'm'),
-        OptionFlags::NONE,
-        OptionArg::String,
-        "",
-        None,
-    );
+    tell_gtk_about_options(&app);
 
-    app.add_main_option(
-        "config",
-        Char::from(b'c'),
-        OptionFlags::NONE,
-        OptionArg::String,
-        "",
-        None,
-    );
-
-    app.add_main_option(
-        "style",
-        Char::from(b's'),
-        OptionFlags::NONE,
-        OptionArg::String,
-        "",
-        None,
-    );
-
-    // TODO: it would be cool if i could do this outside of this block
-    // since thats where it makes sense
-    // but rust
     let modes: Vec<&str> = ARGS.modes.split(',').collect();
 
-    // things that cause the program to exit first
     if modes.is_empty() {
         error!("No modes specified. Try `drun`!");
         exit(1);
@@ -225,6 +82,12 @@ fn main() {
             .events(gdk::EventMask::ALL_EVENTS_MASK)
             .build();
 
+        // set up layer shell stuff
+        gtk_layer_shell::init_for_window(&win);
+        gtk_layer_shell::set_layer(&win, gtk_layer_shell::Layer::Top);
+        gtk_layer_shell::set_keyboard_interactivity(&win, true);
+
+        // apply styles
         let css_provider = load_style(&ARGS.style);
         let css_context = gtk::StyleContext::new();
         css_context.add_provider(&css_provider, 1);
@@ -237,58 +100,31 @@ fn main() {
             );
         };
 
-        win.connect_key_press_event(|_, keypress| keypress_handler_with_config(keypress));
+        // keeping this exchange here for posterity despite it being very outdated:
+        // <autumn>: if i change [this type] to a ref it gets mad about me moving the value
+        //           in there and then has a whole bunch of lifetime bullshit going on
+        // <ash>: THIS is the point of leaking! autumn im gonna leak just for you
 
-        gtk_layer_shell::init_for_window(&win);
+        win.connect_key_press_event(|_, keypress| {
+            if let Some(s) = keypress.keyval().name() {
+                if s == CONFIG.keybinds.quit {
+                    exit(0);
+                }
+            }
 
-        gtk_layer_shell::set_layer(&win, gtk_layer_shell::Layer::Top);
-
-        gtk_layer_shell::set_keyboard_interactivity(&win, true);
-
-        let outer_container = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        outer_container.set_widget_name("window");
-        win.add(&outer_container);
-
-        // set up the application's widgets
-        let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        container.set_widget_name("inner-box");
-        outer_container.add(&container);
-
-        let input = gtk::Entry::new();
-        input.set_widget_name("input");
-        input.set_icon_from_icon_name(gtk::EntryIconPosition::Primary, Some("search"));
-        container.add(&input);
-
-        let scrolled_window =
-            gtk::ScrolledWindow::new(gtk::Adjustment::NONE, gtk::Adjustment::NONE);
-        scrolled_window.set_widget_name("entries-container");
-        scrolled_window.set_vexpand(true);
-        container.add(&scrolled_window);
-
-        let viewport = gtk::Viewport::new(gtk::Adjustment::NONE, gtk::Adjustment::NONE);
-        scrolled_window.add(&viewport);
-
-        let inner_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        viewport.add(&inner_box);
-
-        let flow_box = gtk::FlowBox::new();
-        flow_box.set_orientation(gtk::Orientation::Horizontal);
-        flow_box.set_max_children_per_line(1);
-        inner_box.add(&flow_box);
+            gtk::Inhibit(false)
+        });
 
         let enabled_modes = modes
             .iter()
-            .filter_map(|mode| match mode {
-                &"drun" => Some(Mode::Drun),
-                &"run" => Some(Mode::Run),
+            .filter_map(|mode| match *mode {
+                "drun" => Some(Mode::Drun),
+                "run" => Some(Mode::Run),
                 _ => None,
             })
             .collect();
 
-        // handle input
-        input.connect_changed(move |i| {
-            handle_input(i, &flow_box, &enabled_modes);
-        });
+        make_window_tree(&win, enabled_modes);
 
         trace!("showing window");
         win.show_all();

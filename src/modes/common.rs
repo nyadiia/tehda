@@ -1,6 +1,12 @@
 use log::error;
 use std::{collections::HashMap, path::PathBuf, process::exit};
 
+pub enum Mode {
+    Drun,
+    Run,
+    Custom(String),
+}
+
 pub type ActionFn = Box<dyn Fn()>;
 
 pub struct Entry {

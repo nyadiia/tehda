@@ -172,6 +172,7 @@ pub fn load_style(path: &Option<String>) -> CssProvider {
 }
 
 /// Load the Tehda config.
+#[allow(clippy::module_name_repetitions)] // this is a better name
 pub fn load_config<P: AsRef<Path>>(cfg_path: Option<P>) -> Config {
     trace!("trying to load config");
     if let Some(p) = cfg_path {

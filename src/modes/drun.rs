@@ -6,6 +6,7 @@ use gio::{self, AppLaunchContext};
 use super::common::{run_executable, Entry};
 
 /// convert a filename to desktop app info
+#[allow(clippy::needless_pass_by_value)] // allowed since it would suck in `get_drun_entries`
 fn filename_to_info(filename: GString) -> Option<gio::DesktopAppInfo> {
     // TODO: we might be able to memoize this or something in order to speed
     // this up; that's just a premature optimization thought though
@@ -52,12 +53,13 @@ fn info_to_entry(info: gio::DesktopAppInfo) -> Entry {
     Entry {
         text: info.display_name().to_string(),
         action: default_action(info.clone()),
-        alternate_actions: Some(HashMap::from_iter(
+        alternate_actions: Some(
             info.clone()
                 .list_actions()
                 .into_iter()
-                .map(|a| (a.to_string(), run_alternate_action(info.clone(), a))),
-        )),
+                .map(|a| (a.to_string(), run_alternate_action(info.clone(), a)))
+                .collect::<HashMap<_, _>>(),
+        ),
         open: false,
     }
 }
