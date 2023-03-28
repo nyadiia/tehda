@@ -2,26 +2,25 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build -C lto=fat --release --verbose
-      
-    - name: Upload 
-      uses: actions/upload-artifact@v3
-      with:
-        name: binary
-        path: |
-          target/release/tehda
+      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build --profile release-lto --verbose
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: binary
+          path: |
+            target/release/tehda
     # - name: Run tests
     #   run: cargo test --verbose
