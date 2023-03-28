@@ -88,5 +88,9 @@ pub fn get_drun_entries(query: &str) -> impl Iterator<Item = Entry> + '_ {
         .flatten()
         .take(MAX_DRUN_ENTRIES)
         .map(filename_to_info)
+        .filter(|i| match i {
+            Some(i) => !i.is_hidden() && !i.is_nodisplay(),
+            None => false,
+        })
         .filter_map(|i| i.map(info_to_entry))
 }
