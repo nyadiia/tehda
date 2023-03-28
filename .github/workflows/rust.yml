@@ -25,6 +25,6 @@ jobs:
         with:
           name: binary
           path: |
-            target/release/tehda
+            target/release-lto/tehda
     # - name: Run tests
     #   run: cargo test --verbose
